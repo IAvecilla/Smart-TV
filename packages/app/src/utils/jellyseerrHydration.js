@@ -40,7 +40,9 @@ const hydrateRequestMediaItems = async (requests = []) => {
 				backdropPath: media?.backdropPath || details.backdropPath || details.backdrop_path,
 				overview: media?.overview || details.overview,
 				releaseDate: media?.releaseDate || details.releaseDate || details.release_date,
-				firstAirDate: media?.firstAirDate || details.firstAirDate || details.first_air_date
+				firstAirDate: media?.firstAirDate || details.firstAirDate || details.first_air_date,
+				downloadStatus: media?.downloadStatus || details.mediaInfo?.downloadStatus || [],
+				downloadStatus4k: media?.downloadStatus4k || details.mediaInfo?.downloadStatus4k || []
 			}
 		};
 	};
