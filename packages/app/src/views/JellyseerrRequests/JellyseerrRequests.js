@@ -30,6 +30,45 @@ const getStatusInfo = (request) => {
 	return {label: $L('Unknown'), variant: css.chipPending};
 };
 
+const getDownloadProgress = (request) => {
+	const is4k = request.is4k;
+	const items = is4k
+		? (request.media?.downloadStatus4k || [])
+		: (request.media?.downloadStatus || []);
+	if (!items || items.length === 0) return null;
+
+	const totalSize = items.reduce((sum, item) => sum + (item.size || 0), 0);
+	const totalLeft = items.reduce((sum, item) => sum + (item.sizeLeft || 0), 0);
+	const percent = totalSize > 0 ? Math.round(((totalSize - totalLeft) / totalSize) * 100) : 0;
+
+	const itemWithEpisode = items.find(item => item.episode);
+	const earliestEta = items
+		.map(i => i.estimatedCompletionTime ? new Date(i.estimatedCompletionTime).getTime() : null)
+		.filter(Boolean);
+	const eta = earliestEta.length > 0 ? new Date(Math.min(...earliestEta)) : null;
+
+	return {
+		percent: Math.max(0, Math.min(100, percent)),
+		status: items[0]?.status || '',
+		count: items.length,
+		episode: itemWithEpisode?.episode || null,
+		eta
+	};
+};
+
+const formatEta = (date) => {
+	if (!date) return null;
+	const now = Date.now();
+	const diff = date.getTime() - now;
+	if (diff <= 0) return $L('Finishing...');
+	const mins = Math.ceil(diff / 60000);
+	if (mins < 60) return `${mins}m`;
+	const hours = Math.ceil(mins / 60);
+	if (hours < 24) return `${hours}h`;
+	const days = Math.ceil(hours / 24);
+	return `${days}d`;
+};
+
 // Memoized request item component to avoid arrow functions in JSX props
 const RequestItem = memo(function RequestItem({request, index, onSelect, onCancel}) {
 	const media = request.media;
@@ -37,6 +76,7 @@ const RequestItem = memo(function RequestItem({request, index, onSelect, onCance
 		? jellyseerrApi.getImageUrl(media.posterPath, 'w185')
 		: null;
 	const {label: statusLabel, variant: statusVariant} = getStatusInfo(request);
+	const dl = getDownloadProgress(request);
 
 	const handleClick = useCallback(() => {
 		onSelect(request);
@@ -45,6 +85,11 @@ const RequestItem = memo(function RequestItem({request, index, onSelect, onCance
 	const handleCancelClick = useCallback((e) => {
 		onCancel(request.id, e);
 	}, [request.id, onCancel]);
+
+	const episodeLabel = dl?.episode
+		? `S${dl.episode.seasonNumber}E${dl.episode.episodeNumber}`
+		: null;
+	const etaLabel = dl?.eta ? formatEta(dl.eta) : null;
 
 	return (
 		<SpottableRow
@@ -67,6 +112,26 @@ const RequestItem = memo(function RequestItem({request, index, onSelect, onCance
 						{statusLabel}
 					</span>
 				</Row>
+				{dl && (
+					<Column className={css.downloadProgress}>
+						<div className={css.progressBarTrack}>
+							<div
+								className={css.progressBarFill}
+								style={{width: `${dl.percent}%`}}
+							/>
+							<span className={css.progressBarText}>{dl.percent}%</span>
+						</div>
+						<Row className={css.downloadMeta}>
+							{episodeLabel && (
+								<span className={css.episodeTag}>{episodeLabel}</span>
+							)}
+							<span className={css.downloadStatus}>{dl.status}</span>
+							{etaLabel && (
+								<span className={css.etaTag}>~{etaLabel}</span>
+							)}
+						</Row>
+					</Column>
+				)}
 				<BodyText className={css.date}>
 					{$L('Requested:')} {new Date(request.createdAt).toLocaleDateString()}
 				</BodyText>
@@ -202,7 +267,7 @@ const JellyseerrRequests = ({onSelectItem, onClose, ...rest}) => {
 			<VirtualList
 				dataSize={filteredRequests.length}
 				itemRenderer={renderRequest}
-				itemSize={ri.scale(120 * (settings.uiScale || 1.0))}
+				itemSize={ri.scale(155 * (settings.uiScale || 1.0))}
 				direction="vertical"
 				spotlightId="requests-list"
 			/>
