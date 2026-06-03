@@ -813,6 +813,22 @@ const JellyseerrDetails = ({mediaType, mediaId, onClose, onSelectItem, onPlayInM
 	const fourKDeclined = useMemo(() => requests.some(r => r.is4k && r.status === 3), [requests]);
 	const pendingRequests = useMemo(() => requests.filter(r => r.status === STATUS.PENDING), [requests]);
 
+	const downloadProgress = useMemo(() => {
+		if (!details?.mediaInfo) return null;
+		const hdItems = details.mediaInfo.downloadStatus || [];
+		const fourKItems = details.mediaInfo.downloadStatus4k || [];
+		const items = [...hdItems, ...fourKItems];
+		if (items.length === 0) return null;
+		const totalSize = items.reduce((sum, item) => sum + (item.size || 0), 0);
+		const totalLeft = items.reduce((sum, item) => sum + (item.sizeLeft || 0), 0);
+		const percent = totalSize > 0 ? Math.round(((totalSize - totalLeft) / totalSize) * 100) : 0;
+		return {
+			percent: Math.max(0, Math.min(100, percent)),
+			status: items[0].status || '',
+			count: items.length
+		};
+	}, [details]);
+
 	const getSeasonStatusMap = useCallback((is4k) => {
 		const statusMap = new Map();
 		if (!requests || requests.length === 0) return statusMap;
@@ -1289,6 +1305,20 @@ const JellyseerrDetails = ({mediaType, mediaId, onClose, onSelectItem, onPlayInM
 						<div className={`${css.statusBadge} ${css[`badge${statusBadge.color}`]}`}>
 							{statusBadge.text}
 						</div>
+
+						{/* Download Progress */}
+						{downloadProgress && (
+							<div className={css.downloadProgress}>
+								<div className={css.progressBarTrack}>
+									<div
+										className={css.progressBarFill}
+										style={{width: `${downloadProgress.percent}%`}}
+									/>
+									<span className={css.progressBarText}>{downloadProgress.percent}%</span>
+								</div>
+								<span className={css.downloadStatus}>{downloadProgress.status}</span>
+							</div>
+						)}
 
 						{/* Metadata Row */}
 						<div className={css.metadataRow}>
